@@ -27,8 +27,6 @@ const roleDiv = document.getElementById('role');
 const greenBtn = document.getElementById('greenBtn');
 const redBtn = document.getElementById('redBtn');
 const resetBtn = document.getElementById('resetBtn');
-
-// Initialize
 async function init() {
     try {
         // Get local video stream
@@ -222,8 +220,27 @@ function waitForICEGathering() {
 // Generate QR code
 async function generateQRCode(data, container) {
     container.innerHTML = '';
+
+    // Check if QRCode library is available
+    if (typeof QRCode === 'undefined') {
+        console.error('QRCode library not loaded');
+        container.innerHTML = `
+            <div style="padding: 20px; text-align: center;">
+                <p style="color: red; margin-bottom: 15px;">⚠️ QR Code library failed to load</p>
+                <p style="font-size: 0.9em; color: #666; margin-bottom: 10px;">Copy this data and send it to the other device:</p>
+                <textarea readonly style="width: 100%; height: 150px; padding: 10px; font-family: monospace; font-size: 11px; border: 2px solid #ddd; border-radius: 5px;">${data}</textarea>
+                <button onclick="navigator.clipboard.writeText(this.previousElementSibling.value).then(() => alert('Copied to clipboard!'))" 
+                        style="margin-top: 10px; padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                    Copy to Clipboard
+                </button>
+            </div>
+        `;
+        return;
+    }
+
     try {
         const canvas = document.createElement('canvas');
+        // qrcode-js/browser uses the same API as the old library
         await QRCode.toCanvas(canvas, data, {
             width: 300,
             margin: 2,
@@ -235,7 +252,18 @@ async function generateQRCode(data, container) {
         container.appendChild(canvas);
     } catch (error) {
         console.error('Error generating QR code:', error);
-        container.innerHTML = '<p style="color: red;">Error generating QR code</p>';
+        // Fallback to text display
+        container.innerHTML = `
+            <div style="padding: 20px; text-align: center;">
+                <p style="color: orange; margin-bottom: 15px;">⚠️ Could not generate QR code</p>
+                <p style="font-size: 0.9em; color: #666; margin-bottom: 10px;">Copy this data instead:</p>
+                <textarea readonly style="width: 100%; height: 150px; padding: 10px; font-family: monospace; font-size: 11px; border: 2px solid #ddd; border-radius: 5px;">${data}</textarea>
+                <button onclick="navigator.clipboard.writeText(this.previousElementSibling.value).then(() => alert('Copied!'))" 
+                        style="margin-top: 10px; padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                    Copy to Clipboard
+                </button>
+            </div>
+        `;
     }
 }
 

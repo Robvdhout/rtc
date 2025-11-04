@@ -45,6 +45,12 @@
                     <video id="scannerVideo" playsinline></video>
                     <button id="stopScanBtn" class="btn btn-danger">Stop Scanning</button>
                 </div>
+                <div style="margin-top: 20px; text-align: center;">
+                    <p style="color: #666; margin-bottom: 10px;"><strong>OR</strong> Paste Data:</p>
+                    <textarea id="pasteData" placeholder="Paste connection data here..."
+                              style="width: 100%; height: 80px; padding: 10px; font-family: monospace; font-size: 11px; border: 2px solid #ddd; border-radius: 5px;"></textarea>
+                    <button id="processDataBtn" class="btn btn-secondary" style="margin-top: 10px;">Process Data</button>
+                </div>
             </div>
         </div>
 
@@ -71,9 +77,9 @@
         </div>
     </div>
 
-    <!-- Include QR code libraries with fallbacks -->
-    <script src="https://cdn.jsdelivr.net/npm/qrcode"></script>
-    <script src="https://cdn.jsdelivr.net/npm/jsqr"></script>
+    <!-- Include QR code libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/lib/browser.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
