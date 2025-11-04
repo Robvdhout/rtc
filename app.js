@@ -26,20 +26,9 @@ const statusDiv = document.getElementById('status');
 const roleDiv = document.getElementById('role');
 const greenBtn = document.getElementById('greenBtn');
 const redBtn = document.getElementById('redBtn');
-const resetBtn = document.getElementById('resetBtn');
+// Initialize
 async function init() {
-    try {
-        // Get local video stream
-        localStream = await navigator.mediaDevices.getUserMedia({
-            video: { width: 1280, height: 720 },
-            audio: true
-        });
-        localVideo.srcObject = localStream;
-        updateStatus('waiting', 'Ready to connect. Click "Generate QR Code" to start or "Scan QR Code" to join.');
-    } catch (error) {
-        console.error('Error accessing media devices:', error);
-        updateStatus('waiting', 'Error: Could not access camera/microphone. Please grant permissions.');
-    }
+    updateStatus('waiting', '✅ Ready to connect. Click "Generate QR Code" to start or "Scan QR Code" to join.');
 }
 
 // Update status display
@@ -168,8 +157,26 @@ function sendBackgroundChange(color) {
 // Create offer (Device 1)
 createOfferBtn.addEventListener('click', async () => {
     try {
-        updateStatus('connecting', 'Creating offer...');
+        updateStatus('connecting', 'Requesting camera access...');
         roleDiv.textContent = '📱 You are Device 1 (Offerer)';
+
+        // Get local video stream if not already available
+        if (!localStream) {
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+                    audio: true
+                });
+                localVideo.srcObject = localStream;
+            } catch (error) {
+                console.error('Error accessing media devices:', error);
+                alert('Camera/microphone access is required to create a connection. Please grant permissions and try again.');
+                updateStatus('waiting', '⚠️ Camera access denied. Please grant permissions and try again.');
+                return;
+            }
+        }
+
+        updateStatus('connecting', 'Creating offer...');
 
         // Create peer connection
         if (peerConnection) {
@@ -190,7 +197,7 @@ createOfferBtn.addEventListener('click', async () => {
 
         // Generate QR code with the complete offer
         const offerData = JSON.stringify(peerConnection.localDescription);
-        await generateQRCode(offerData, offerQR);
+        generateQRCode(offerData, offerQR);
 
         updateStatus('connecting', 'Show this QR code to Device 2');
         createOfferBtn.disabled = true;
@@ -218,22 +225,50 @@ function waitForICEGathering() {
 }
 
 // Generate QR code
-async function generateQRCode(data, container) {
+function generateQRCode(data, container) {
     container.innerHTML = '';
+
+    // Check if QRCode library is available
+    if (typeof QRCode === 'undefined') {
+        console.error('QRCode library not loaded');
+        container.innerHTML = `
+            <div style="padding: 20px; text-align: center;">
+                <p style="color: red; margin-bottom: 15px;">⚠️ QR Code library failed to load</p>
+                <p style="font-size: 0.9em; color: #666; margin-bottom: 10px;">Copy this data and send it to the other device:</p>
+                <textarea readonly style="width: 100%; height: 150px; padding: 10px; font-family: monospace; font-size: 11px; border: 2px solid #ddd; border-radius: 5px;">${data}</textarea>
+                <button onclick="navigator.clipboard.writeText(this.previousElementSibling.value).then(() => alert('Copied to clipboard!'))" 
+                        style="margin-top: 10px; padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                    Copy to Clipboard
+                </button>
+            </div>
+        `;
+        return;
+    }
+
     try {
-        const canvas = document.createElement('canvas');
-        await QRCode.toCanvas(canvas, data, {
+        // QRCodeJS uses a different API - it creates the element itself
+        new QRCode(container, {
+            text: data,
             width: 300,
-            margin: 2,
-            color: {
-                dark: '#000000',
-                light: '#ffffff'
-            }
+            height: 300,
+            colorDark: "#000000",
+            colorLight: "#ffffff",
+            correctLevel: QRCode.CorrectLevel.M
         });
-        container.appendChild(canvas);
     } catch (error) {
         console.error('Error generating QR code:', error);
-        container.innerHTML = '<p style="color: red;">Error generating QR code</p>';
+        // Fallback to text display
+        container.innerHTML = `
+            <div style="padding: 20px; text-align: center;">
+                <p style="color: orange; margin-bottom: 15px;">⚠️ Could not generate QR code</p>
+                <p style="font-size: 0.9em; color: #666; margin-bottom: 10px;">Copy this data instead:</p>
+                <textarea readonly style="width: 100%; height: 150px; padding: 10px; font-family: monospace; font-size: 11px; border: 2px solid #ddd; border-radius: 5px;">${data}</textarea>
+                <button onclick="navigator.clipboard.writeText(this.previousElementSibling.value).then(() => alert('Copied!'))" 
+                        style="margin-top: 10px; padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                    Copy to Clipboard
+                </button>
+            </div>
+        `;
     }
 }
 
@@ -322,8 +357,26 @@ async function handleScannedData(data) {
 // Handle offer (Device 2)
 async function handleOffer(offer) {
     try {
-        updateStatus('connecting', 'Processing offer...');
+        updateStatus('connecting', 'Requesting camera access...');
         roleDiv.textContent = '📱 You are Device 2 (Answerer)';
+
+        // Get local video stream if not already available
+        if (!localStream) {
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+                    audio: true
+                });
+                localVideo.srcObject = localStream;
+            } catch (error) {
+                console.error('Error accessing media devices:', error);
+                alert('Camera/microphone access is required. Please grant permissions and try again.');
+                updateStatus('waiting', '⚠️ Camera access denied. Please grant permissions and try again.');
+                return;
+            }
+        }
+
+        updateStatus('connecting', 'Processing offer...');
 
         // Create peer connection
         if (peerConnection) {
@@ -348,7 +401,7 @@ async function handleOffer(offer) {
 
         // Generate QR code with answer
         const answerData = JSON.stringify(peerConnection.localDescription);
-        await generateQRCode(answerData, offerQR);
+        generateQRCode(answerData, offerQR);
 
         updateStatus('connecting', 'Show this QR code to Device 1');
     } catch (error) {
