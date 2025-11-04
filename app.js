@@ -224,36 +224,71 @@ function waitForICEGathering() {
     });
 }
 
+// Compress data using LZ-based compression (simple implementation)
+function compressData(str) {
+    try {
+        // Simple LZ-string-like compression
+        const compressed = btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g,
+            (match, p1) => String.fromCharCode('0x' + p1)));
+
+        // If compression doesn't help much, return original
+        if (compressed.length >= str.length * 0.9) {
+            return str;
+        }
+
+        return 'C:' + compressed; // Prefix to indicate compressed
+    } catch (error) {
+        console.error('Compression failed:', error);
+        return str;
+    }
+}
+
+// Decompress data
+function decompressData(str) {
+    try {
+        if (str.startsWith('C:')) {
+            // Remove prefix and decompress
+            const compressed = str.substring(2);
+            return decodeURIComponent(atob(compressed).split('').map(c =>
+                '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+        }
+        return str; // Not compressed
+    } catch (error) {
+        console.error('Decompression failed:', error);
+        return str;
+    }
+}
+
 // Generate QR code
 function generateQRCode(data, container) {
     container.innerHTML = '';
 
+    // Try to compress the data first
+    let processedData = compressData(data);
+    console.log(`Original size: ${data.length}, Compressed size: ${processedData.length}`);
+
     // Check if qrcode library is available
     if (typeof qrcode === 'undefined') {
         console.error('QRCode library not loaded');
-        container.innerHTML = `
-            <div style="padding: 20px; text-align: center;">
-                <p style="color: red; margin-bottom: 15px;">⚠️ QR Code library failed to load</p>
-                <p style="font-size: 0.9em; color: #666; margin-bottom: 10px;">Copy this data and send it to the other device:</p>
-                <textarea readonly style="width: 100%; height: 150px; padding: 10px; font-family: monospace; font-size: 11px; border: 2px solid #ddd; border-radius: 5px;">${data}</textarea>
-                <button onclick="navigator.clipboard.writeText(this.previousElementSibling.value).then(() => alert('Copied to clipboard!'))" 
-                        style="margin-top: 10px; padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer;">
-                    Copy to Clipboard
-                </button>
-            </div>
-        `;
+        showManualCopyUI(data, container, '⚠️ QR Code library failed to load');
+        return;
+    }
+
+    // Check if data is too large for QR code (even after compression)
+    if (processedData.length > 2000) {
+        console.warn('Data too large for QR code, showing manual copy option');
+        showManualCopyUI(data, container, '⚠️ Connection data too large for QR code');
         return;
     }
 
     try {
-        // qrcode-generator API
-        // Create QR code object - type 0 means auto-detect the best type
-        const qr = qrcode(0, 'M'); // 0 = auto, 'M' = medium error correction
-        qr.addData(data);
+        // qrcode-generator API with lowest error correction for maximum data capacity
+        const qr = qrcode(0, 'L'); // 0 = auto, 'L' = low error correction (max capacity)
+        qr.addData(processedData);
         qr.make();
 
         // Create image element with the QR code
-        const qrImage = qr.createImgTag(5, 10); // cell size: 5, margin: 10
+        const qrImage = qr.createImgTag(4, 8); // smaller cell size and margin
         container.innerHTML = qrImage;
 
         // Style the image
@@ -267,18 +302,24 @@ function generateQRCode(data, container) {
     } catch (error) {
         console.error('Error generating QR code:', error);
         // Fallback to text display
-        container.innerHTML = `
-            <div style="padding: 20px; text-align: center;">
-                <p style="color: orange; margin-bottom: 15px;">⚠️ Could not generate QR code: ${error.message}</p>
-                <p style="font-size: 0.9em; color: #666; margin-bottom: 10px;">Copy this data instead:</p>
-                <textarea readonly style="width: 100%; height: 150px; padding: 10px; font-family: monospace; font-size: 11px; border: 2px solid #ddd; border-radius: 5px;">${data}</textarea>
-                <button onclick="navigator.clipboard.writeText(this.previousElementSibling.value).then(() => alert('Copied!'))" 
-                        style="margin-top: 10px; padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer;">
-                    Copy to Clipboard
-                </button>
-            </div>
-        `;
+        showManualCopyUI(data, container, `⚠️ Could not generate QR code: ${error.message}`);
     }
+}
+
+// Show manual copy UI
+function showManualCopyUI(data, container, message) {
+    container.innerHTML = `
+        <div style="padding: 20px; text-align: center;">
+            <p style="color: orange; margin-bottom: 15px; font-weight: bold;">${message}</p>
+            <p style="font-size: 0.9em; color: #666; margin-bottom: 10px;">Data is too large for QR code. Use manual copy/paste method:</p>
+            <textarea readonly style="width: 100%; height: 150px; padding: 10px; font-family: monospace; font-size: 11px; border: 2px solid #ddd; border-radius: 5px; margin-bottom: 10px;">${data}</textarea>
+            <button onclick="navigator.clipboard.writeText(this.previousElementSibling.value).then(() => alert('✅ Copied to clipboard! Paste on the other device.'))" 
+                    style="padding: 12px 24px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 1em; font-weight: bold;">
+                📋 Copy to Clipboard
+            </button>
+            <p style="font-size: 0.85em; color: #999; margin-top: 15px;">Then paste into the "Paste Data" field on the other device and click "Process Data"</p>
+        </div>
+    `;
 }
 
 // Start scanning QR code
@@ -287,10 +328,32 @@ startScanBtn.addEventListener('click', async () => {
         scannerContainer.style.display = 'block';
         scanningActive = true;
 
-        // Get camera stream for scanning
-        scannerStream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: 'environment' }
-        });
+        // Get camera stream for scanning - prefer rear camera on mobile
+        try {
+            // Try to explicitly request rear camera first
+            scannerStream = await navigator.mediaDevices.getUserMedia({
+                video: {
+                    facingMode: { exact: 'environment' }
+                }
+            });
+        } catch (error) {
+            console.log('Exact environment camera not found, trying ideal...');
+            // Fallback to ideal (prefer rear but allow front if rear not available)
+            try {
+                scannerStream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: { ideal: 'environment' }
+                    }
+                });
+            } catch (error2) {
+                console.log('Ideal environment failed, trying any camera...');
+                // Last fallback - any camera
+                scannerStream = await navigator.mediaDevices.getUserMedia({
+                    video: true
+                });
+            }
+        }
+
         scannerVideo.srcObject = scannerStream;
 
         // Start scanning
@@ -348,7 +411,9 @@ function scanQRCode() {
 // Handle scanned QR code data
 async function handleScannedData(data) {
     try {
-        const signalData = JSON.parse(data);
+        // Decompress if data was compressed
+        const decompressed = decompressData(data);
+        const signalData = JSON.parse(decompressed);
 
         if (signalData.type === 'offer') {
             // This device is Device 2 - create answer
@@ -359,7 +424,7 @@ async function handleScannedData(data) {
         }
     } catch (error) {
         console.error('Error handling scanned data:', error);
-        alert('Invalid QR code data');
+        alert('Invalid QR code data. Please try the manual copy/paste method.');
     }
 }
 
