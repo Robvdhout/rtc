@@ -239,16 +239,32 @@ function rebuildSDP(minimalDescription) {
     });
 }
 
-// Compress data using LZ-based compression (simple implementation)
+// Compress data using base64 encoding
 function compressData(str) {
     try {
-        // Simple LZ-string-like compression
-        const compressed = btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g,
+        // Parse JSON and re-stringify without whitespace to reduce size
+        let optimized = str;
+        try {
+            const parsed = JSON.parse(str);
+            // Remove extra whitespace from SDP
+            if (parsed.sdp) {
+                // Remove unnecessary blank lines and trim
+                parsed.sdp = parsed.sdp.split('\r\n')
+                    .filter(line => line.trim().length > 0)
+                    .join('\r\n');
+            }
+            optimized = JSON.stringify(parsed);
+        } catch (e) {
+            // If not JSON, use as-is
+        }
+
+        // Base64 encode
+        const compressed = btoa(encodeURIComponent(optimized).replace(/%([0-9A-F]{2})/g,
             (match, p1) => String.fromCharCode('0x' + p1)));
 
         // If compression doesn't help much, return original
-        if (compressed.length >= str.length * 0.9) {
-            return str;
+        if (compressed.length >= optimized.length * 0.95) {
+            return optimized;
         }
 
         return 'C:' + compressed; // Prefix to indicate compressed
@@ -290,7 +306,8 @@ function generateQRCode(data, container) {
     }
 
     // Check if data is too large for QR code (even after compression)
-    if (processedData.length > 2000) {
+    // Modern QR scanners can handle larger codes - Version 40 can hold ~3KB
+    if (processedData.length > 4000) {
         console.warn('Data too large for QR code, showing manual copy option');
         showManualCopyUI(data, container, '⚠️ Connection data too large for QR code');
         return;
@@ -302,8 +319,8 @@ function generateQRCode(data, container) {
         qr.addData(processedData);
         qr.make();
 
-        // Create image element with the QR code
-        const qrImage = qr.createImgTag(4, 8); // smaller cell size and margin
+        // Create image element with the QR code - very small cells for dense data
+        const qrImage = qr.createImgTag(3, 4); // smaller cell size (3px) and margin (4px)
         container.innerHTML = qrImage;
 
         // Style the image
