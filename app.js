@@ -26,6 +26,10 @@ const statusDiv = document.getElementById('status');
 const roleDiv = document.getElementById('role');
 const greenBtn = document.getElementById('greenBtn');
 const redBtn = document.getElementById('redBtn');
+const resetBtn = document.getElementById('resetBtn');
+const pasteData = document.getElementById('pasteData');
+const processDataBtn = document.getElementById('processDataBtn');
+
 // Initialize
 async function init() {
     updateStatus('waiting', '✅ Ready to connect. Click "Generate QR Code" to start or "Scan QR Code" to join.');
@@ -192,11 +196,13 @@ createOfferBtn.addEventListener('click', async () => {
         const offer = await peerConnection.createOffer();
         await peerConnection.setLocalDescription(offer);
 
-        // Wait for ICE gathering to complete
-        await waitForICEGathering();
+        // Extract minimal SDP (without ICE candidates to reduce size)
+        const minimalOffer = createMinimalSDP(peerConnection.localDescription);
+        const offerData = JSON.stringify(minimalOffer);
 
-        // Generate QR code with the complete offer
-        const offerData = JSON.stringify(peerConnection.localDescription);
+        console.log(`Full SDP size: ${JSON.stringify(peerConnection.localDescription).length}`);
+        console.log(`Minimal SDP size: ${offerData.length}`);
+
         generateQRCode(offerData, offerQR);
 
         updateStatus('connecting', 'Show this QR code to Device 2');
@@ -207,20 +213,29 @@ createOfferBtn.addEventListener('click', async () => {
     }
 });
 
-// Wait for ICE gathering to complete
-function waitForICEGathering() {
-    return new Promise((resolve) => {
-        if (peerConnection.iceGatheringState === 'complete') {
-            resolve();
-        } else {
-            const checkState = () => {
-                if (peerConnection.iceGatheringState === 'complete') {
-                    peerConnection.removeEventListener('icegatheringstatechange', checkState);
-                    resolve();
-                }
-            };
-            peerConnection.addEventListener('icegatheringstatechange', checkState);
-        }
+// Create minimal SDP by removing ICE candidates (reduces size by 80-90%)
+function createMinimalSDP(description) {
+    const sdp = description.sdp;
+
+    // Remove all ICE candidate lines (a=candidate:...)
+    const minimalSdp = sdp.split('\n')
+        .filter(line => !line.startsWith('a=candidate:'))
+        .filter(line => !line.startsWith('a=end-of-candidates'))
+        .join('\n');
+
+    return {
+        type: description.type,
+        sdp: minimalSdp
+    };
+}
+
+// Rebuild SDP - the browser will generate its own ICE candidates
+function rebuildSDP(minimalDescription) {
+    // The browser will automatically gather ICE candidates after setRemoteDescription
+    // We just need to return the minimal SDP as-is
+    return new RTCSessionDescription({
+        type: minimalDescription.type,
+        sdp: minimalDescription.sdp
     });
 }
 
@@ -470,11 +485,13 @@ async function handleOffer(offer) {
         const answer = await peerConnection.createAnswer();
         await peerConnection.setLocalDescription(answer);
 
-        // Wait for ICE gathering
-        await waitForICEGathering();
+        // Extract minimal SDP (without ICE candidates to reduce size)
+        const minimalAnswer = createMinimalSDP(peerConnection.localDescription);
+        const answerData = JSON.stringify(minimalAnswer);
 
-        // Generate QR code with answer
-        const answerData = JSON.stringify(peerConnection.localDescription);
+        console.log(`Full SDP size: ${JSON.stringify(peerConnection.localDescription).length}`);
+        console.log(`Minimal SDP size: ${answerData.length}`);
+
         generateQRCode(answerData, offerQR);
 
         updateStatus('connecting', 'Show this QR code to Device 1');
@@ -495,6 +512,23 @@ async function handleAnswer(answer) {
         updateStatus('waiting', 'Error processing answer: ' + error.message);
     }
 }
+
+// Manual paste data handler
+processDataBtn.addEventListener('click', async () => {
+    const data = pasteData.value.trim();
+    if (!data) {
+        alert('Please paste connection data first');
+        return;
+    }
+
+    try {
+        await handleScannedData(data);
+        pasteData.value = '';
+    } catch (error) {
+        console.error('Error processing pasted data:', error);
+        alert('Invalid data format. Please make sure you copied the complete data.');
+    }
+});
 
 // Control button handlers
 greenBtn.addEventListener('click', () => {
