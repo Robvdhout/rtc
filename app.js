@@ -228,8 +228,8 @@ function waitForICEGathering() {
 function generateQRCode(data, container) {
     container.innerHTML = '';
 
-    // Check if QRCode library is available
-    if (typeof QRCode === 'undefined') {
+    // Check if qrcode library is available
+    if (typeof qrcode === 'undefined') {
         console.error('QRCode library not loaded');
         container.innerHTML = `
             <div style="padding: 20px; text-align: center;">
@@ -246,21 +246,30 @@ function generateQRCode(data, container) {
     }
 
     try {
-        // QRCodeJS uses a different API - it creates the element itself
-        new QRCode(container, {
-            text: data,
-            width: 300,
-            height: 300,
-            colorDark: "#000000",
-            colorLight: "#ffffff",
-            correctLevel: QRCode.CorrectLevel.M
-        });
+        // qrcode-generator API
+        // Create QR code object - type 0 means auto-detect the best type
+        const qr = qrcode(0, 'M'); // 0 = auto, 'M' = medium error correction
+        qr.addData(data);
+        qr.make();
+
+        // Create image element with the QR code
+        const qrImage = qr.createImgTag(5, 10); // cell size: 5, margin: 10
+        container.innerHTML = qrImage;
+
+        // Style the image
+        const img = container.querySelector('img');
+        if (img) {
+            img.style.maxWidth = '100%';
+            img.style.height = 'auto';
+            img.style.display = 'block';
+            img.style.margin = '0 auto';
+        }
     } catch (error) {
         console.error('Error generating QR code:', error);
         // Fallback to text display
         container.innerHTML = `
             <div style="padding: 20px; text-align: center;">
-                <p style="color: orange; margin-bottom: 15px;">⚠️ Could not generate QR code</p>
+                <p style="color: orange; margin-bottom: 15px;">⚠️ Could not generate QR code: ${error.message}</p>
                 <p style="font-size: 0.9em; color: #666; margin-bottom: 10px;">Copy this data instead:</p>
                 <textarea readonly style="width: 100%; height: 150px; padding: 10px; font-family: monospace; font-size: 11px; border: 2px solid #ddd; border-radius: 5px;">${data}</textarea>
                 <button onclick="navigator.clipboard.writeText(this.previousElementSibling.value).then(() => alert('Copied!'))" 
