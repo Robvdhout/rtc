@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebRTC QR Code Connection</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>WebRTC QR Code Connection</h1>
+
+        <div class="status-section">
+            <div id="status" class="status">Waiting to connect...</div>
+            <div id="role" class="role"></div>
+        </div>
+
+        <div class="main-content">
+            <!-- Local video -->
+            <div class="video-section">
+                <h2>Your Camera</h2>
+                <video id="localVideo" autoplay muted playsinline></video>
+            </div>
+
+            <!-- Remote video -->
+            <div class="video-section">
+                <h2>Remote Participant</h2>
+                <video id="remoteVideo" autoplay playsinline></video>
+            </div>
+        </div>
+
+        <!-- Connection Setup -->
+        <div class="connection-section">
+            <div class="qr-section">
+                <h3>Step 1: Create Offer</h3>
+                <button id="createOfferBtn" class="btn btn-primary">Generate QR Code (Start)</button>
+                <div id="offerQR" class="qr-container"></div>
+                <div id="offerData" class="data-display"></div>
+            </div>
+
+            <div class="qr-section">
+                <h3>Step 2: Scan QR Code</h3>
+                <button id="startScanBtn" class="btn btn-secondary">Scan QR Code</button>
+                <div id="scannerContainer" class="scanner-container" style="display: none;">
+                    <video id="scannerVideo" playsinline></video>
+                    <button id="stopScanBtn" class="btn btn-danger">Stop Scanning</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Control Buttons -->
+        <div class="control-section">
+            <h3>Control Remote Background</h3>
+            <div class="button-group">
+                <button id="greenBtn" class="btn btn-green" disabled>Green Background</button>
+                <button id="redBtn" class="btn btn-red" disabled>Red Background</button>
+                <button id="resetBtn" class="btn btn-default" disabled>Reset Background</button>
+            </div>
+        </div>
+
+        <!-- Instructions -->
+        <div class="instructions">
+            <h3>How to Use:</h3>
+            <ol>
+                <li><strong>Device 1:</strong> Click "Generate QR Code" to create an offer</li>
+                <li><strong>Device 2:</strong> Click "Scan QR Code" and scan Device 1's QR code</li>
+                <li><strong>Device 2:</strong> A new QR code will appear - show it to Device 1</li>
+                <li><strong>Device 1:</strong> Click "Scan QR Code" and scan Device 2's QR code</li>
+                <li><strong>Both:</strong> Once connected, use the color buttons to change each other's background!</li>
+            </ol>
+        </div>
+    </div>
+
+    <!-- Include QR code libraries -->
+    <script src="https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <script src="https://unpkg.com/jsqr@1.4.0/dist/jsQR.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
+

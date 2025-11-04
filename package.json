@@ -1,0 +1,20 @@
+{
+  "name": "webrtc-qr-connection",
+  "version": "1.0.0",
+  "description": "WebRTC connection using QR codes with interactive background control",
+  "main": "app.js",
+  "scripts": {
+    "start": "npx http-server -p 8080 -c-1"
+  },
+  "keywords": [
+    "webrtc",
+    "qr-code",
+    "peer-to-peer"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  }
+}
+

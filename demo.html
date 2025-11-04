@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebRTC QR Demo - Instructions</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .container {
+            max-width: 800px;
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+        h1 {
+            color: #667eea;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+        }
+        .flow {
+            margin: 30px 0;
+        }
+        .step {
+            background: #f8f9fa;
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 10px;
+            border-left: 5px solid #667eea;
+        }
+        .step h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+        .step p {
+            color: #555;
+            line-height: 1.6;
+        }
+        .device {
+            display: inline-block;
+            padding: 5px 15px;
+            background: #667eea;
+            color: white;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+        .device.d2 {
+            background: #764ba2;
+        }
+        .features {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin: 30px 0;
+        }
+        .feature {
+            background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        .feature-icon {
+            font-size: 3em;
+            margin-bottom: 10px;
+        }
+        .feature h4 {
+            color: #667eea;
+            margin-bottom: 8px;
+        }
+        .feature p {
+            color: #666;
+            font-size: 0.9em;
+        }
+        .cta {
+            text-align: center;
+            margin-top: 40px;
+        }
+        .btn {
+            display: inline-block;
+            padding: 20px 40px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 10px;
+            font-size: 1.3em;
+            font-weight: bold;
+            transition: transform 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+        .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+        .tech-note {
+            background: #fff9e6;
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 5px solid #ffd700;
+            margin-top: 30px;
+        }
+        .tech-note h3 {
+            color: #d4a800;
+            margin-bottom: 10px;
+        }
+        .tech-note p {
+            color: #666;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎥 WebRTC QR Connection</h1>
+
+        <div class="features">
+            <div class="feature">
+                <div class="feature-icon">📱</div>
+                <h4>QR Code Setup</h4>
+                <p>No server needed! Connect devices by scanning QR codes</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">🎨</div>
+                <h4>Interactive Control</h4>
+                <p>Change each other's background colors in real-time</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">🔒</div>
+                <h4>Peer-to-Peer</h4>
+                <p>Direct encrypted connection between devices</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">🎥</div>
+                <h4>Video & Audio</h4>
+                <p>Real-time video/audio streaming using WebRTC</p>
+            </div>
+        </div>
+
+        <div class="flow">
+            <h2 style="color: #667eea; margin-bottom: 20px;">How It Works</h2>
+
+            <div class="step">
+                <h3><span class="device">Device 1</span> Step 1</h3>
+                <p>Click "Generate QR Code" to create a WebRTC offer. A QR code will appear on the screen containing the connection information.</p>
+            </div>
+
+            <div class="step">
+                <h3><span class="device d2">Device 2</span> Step 2</h3>
+                <p>Click "Scan QR Code" and point the camera at Device 1's screen. The app will read the offer and automatically create an answer.</p>
+            </div>
+
+            <div class="step">
+                <h3><span class="device d2">Device 2</span> Step 3</h3>
+                <p>A new QR code appears on Device 2 containing the answer. Show this to Device 1.</p>
+            </div>
+
+            <div class="step">
+                <h3><span class="device">Device 1</span> Step 4</h3>
+                <p>Click "Scan QR Code" and scan Device 2's QR code. The connection will be established!</p>
+            </div>
+
+            <div class="step">
+                <h3>🎉 Connected!</h3>
+                <p>Both devices are now connected. Use the colored buttons to change the remote participant's background color. Have fun!</p>
+            </div>
+        </div>
+
+        <div class="tech-note">
+            <h3>💡 Technical Note</h3>
+            <p>This application uses WebRTC for peer-to-peer communication. The QR codes contain the SDP (Session Description Protocol) data needed to establish the connection. Once connected, all data flows directly between devices with no intermediary server. A data channel is used to send control messages for the background color changes.</p>
+        </div>
+
+        <div class="cta">
+            <a href="index.html" class="btn">Launch Application →</a>
+        </div>
+    </div>
+</body>
+</html>
+
