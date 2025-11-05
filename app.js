@@ -102,7 +102,19 @@ function setupDataChannel(channel) {
     dataChannel = channel;
 
     dataChannel.onopen = () => {
-        console.log('Data channel opened');
+        console.log('Data channel opened - bootstrapping ICE candidates');
+
+        // Send pending ICE candidates through data channel
+        if (pendingIceCandidates.length > 0) {
+            console.log(`Sending ${pendingIceCandidates.length} ICE candidates via data channel`);
+            const message = JSON.stringify({
+                type: 'ice-candidates',
+                candidates: pendingIceCandidates
+            });
+            dataChannel.send(message);
+            pendingIceCandidates = [];
+        }
+
         enableControlButtons();
     };
 
@@ -126,6 +138,10 @@ function handleRemoteMessage(message) {
     try {
         const data = JSON.parse(message);
         switch (data.type) {
+            case 'ice-candidates':
+                // Receive and add ICE candidates sent via data channel
+                handleBootstrapICECandidates(data.candidates);
+                break;
             case 'background':
                 changeLocalBackground(data.color);
                 break;
@@ -135,6 +151,37 @@ function handleRemoteMessage(message) {
     } catch (error) {
         console.error('Error handling message:', error);
     }
+}
+
+// Handle ICE candidates received via data channel bootstrap
+async function handleBootstrapICECandidates(candidates) {
+    if (iceCandidatesReceived) {
+        console.log('ICE candidates already received, ignoring duplicates');
+        return;
+    }
+
+    console.log(`Received ${candidates.length} ICE candidates via data channel`);
+    iceCandidatesReceived = true;
+
+    // Add each candidate to the peer connection
+    for (const candidateStr of candidates) {
+        try {
+            // Reconstruct the candidate object
+            const candidate = new RTCIceCandidate({
+                candidate: candidateStr,
+                sdpMLineIndex: 0, // Will be auto-detected by browser
+                sdpMid: null
+            });
+
+            await peerConnection.addIceCandidate(candidate);
+            console.log('Added remote ICE candidate via bootstrap');
+        } catch (error) {
+            console.warn('Failed to add ICE candidate:', error);
+        }
+    }
+
+    console.log('✅ ICE candidate bootstrap complete - connection should upgrade now');
+    updateStatus('connecting', '✅ Exchanged ICE candidates - optimizing connection...');
 }
 
 // Change local background color
@@ -196,13 +243,22 @@ createOfferBtn.addEventListener('click', async () => {
         const offer = await peerConnection.createOffer();
         await peerConnection.setLocalDescription(offer);
 
+        // Wait briefly for initial ICE candidates to be gathered
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // Extract and store ICE candidates for bootstrap
+        pendingIceCandidates = extractICECandidates(peerConnection.localDescription);
+        console.log(`Stored ${pendingIceCandidates.length} ICE candidates for bootstrap`);
+
         // Extract minimal SDP (without ICE candidates to reduce size)
         const minimalOffer = createMinimalSDP(peerConnection.localDescription);
         const offerData = JSON.stringify(minimalOffer);
 
         console.log(`Full SDP size: ${JSON.stringify(peerConnection.localDescription).length}`);
         console.log(`Minimal SDP size: ${offerData.length}`);
+        console.log(`Bootstrap method: Will send ICE candidates via data channel after connection`);
 
+        // Generate QR code
         generateQRCode(offerData, offerQR);
 
         updateStatus('connecting', 'Show this QR code to Device 2');
@@ -212,6 +268,10 @@ createOfferBtn.addEventListener('click', async () => {
         updateStatus('waiting', 'Error creating offer: ' + error.message);
     }
 });
+
+// Store ICE candidates to send later via data channel
+let pendingIceCandidates = [];
+let iceCandidatesReceived = false;
 
 // Create minimal SDP by removing ICE candidates (reduces size by 80-90%)
 function createMinimalSDP(description) {
@@ -229,15 +289,22 @@ function createMinimalSDP(description) {
     };
 }
 
-// Rebuild SDP - the browser will generate its own ICE candidates
-function rebuildSDP(minimalDescription) {
-    // The browser will automatically gather ICE candidates after setRemoteDescription
-    // We just need to return the minimal SDP as-is
-    return new RTCSessionDescription({
-        type: minimalDescription.type,
-        sdp: minimalDescription.sdp
-    });
+// Extract ICE candidates from full SDP
+function extractICECandidates(description) {
+    const sdp = description.sdp;
+    const candidates = [];
+
+    const lines = sdp.split('\n');
+    for (const line of lines) {
+        if (line.startsWith('a=candidate:')) {
+            // Parse the candidate line
+            candidates.push(line.substring(2)); // Remove 'a=' prefix
+        }
+    }
+
+    return candidates;
 }
+
 
 // Compress data using base64 encoding
 function compressData(str) {
@@ -289,6 +356,7 @@ function decompressData(str) {
         return str;
     }
 }
+
 
 // Generate QR code
 function generateQRCode(data, container) {
@@ -502,13 +570,22 @@ async function handleOffer(offer) {
         const answer = await peerConnection.createAnswer();
         await peerConnection.setLocalDescription(answer);
 
+        // Wait briefly for initial ICE candidates to be gathered
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // Extract and store ICE candidates for bootstrap
+        pendingIceCandidates = extractICECandidates(peerConnection.localDescription);
+        console.log(`Stored ${pendingIceCandidates.length} ICE candidates for bootstrap`);
+
         // Extract minimal SDP (without ICE candidates to reduce size)
         const minimalAnswer = createMinimalSDP(peerConnection.localDescription);
         const answerData = JSON.stringify(minimalAnswer);
 
         console.log(`Full SDP size: ${JSON.stringify(peerConnection.localDescription).length}`);
         console.log(`Minimal SDP size: ${answerData.length}`);
+        console.log(`Bootstrap method: Will send ICE candidates via data channel after connection`);
 
+        // Generate QR code
         generateQRCode(answerData, offerQR);
 
         updateStatus('connecting', 'Show this QR code to Device 1');
@@ -574,4 +651,3 @@ function disableControlButtons() {
 
 // Initialize on page load
 init();
-
