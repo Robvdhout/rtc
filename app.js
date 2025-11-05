@@ -805,9 +805,8 @@ async function handleOffer(offer) {
             setupDataChannel(event.channel);
         };
 
-        // Sanitize and set remote description
-        const sanitizedOffer = sanitizeSDP(offer);
-        await peerConnection.setRemoteDescription(new RTCSessionDescription(sanitizedOffer));
+        // Set remote description
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
 
         // Create answer
         const answer = await peerConnection.createAnswer();
@@ -835,9 +834,8 @@ async function handleAnswer(answer) {
     try {
         updateStatus('connecting', 'Processing answer...');
 
-        // Sanitize and set remote description
-        const sanitizedAnswer = sanitizeSDP(answer);
-        await peerConnection.setRemoteDescription(new RTCSessionDescription(sanitizedAnswer));
+        // Set remote description
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
 
         updateStatus('connecting', 'Connection established! Waiting for peer...');
     } catch (error) {
