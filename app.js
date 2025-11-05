@@ -346,10 +346,10 @@ function sanitizeSDP(description) {
         return description;
     }
 
-    // Remove lines that cause parsing errors in some browsers
+    // Remove ONLY lines that cause parsing errors in some browsers
+    // Note: a=sctp-port is kept because it's essential for data channel structure
     const problematicLines = [
         'a=max-message-size:', // Causes issues on some browsers
-        'a=sctp-port:', // Causes parsing errors on some browsers
         'a=extmap-allow-mixed' // Sometimes problematic
     ];
 
@@ -358,7 +358,8 @@ function sanitizeSDP(description) {
         return !problematicLines.some(problematic => line.startsWith(problematic));
     }).join('\r\n');
 
-    console.log(`SDP sanitized: removed ${lines.length - sanitized.split('\r\n').length} problematic lines`);
+    const removedCount = lines.length - sanitized.split('\r\n').length;
+    console.log(`SDP sanitized: removed ${removedCount} problematic line(s)`);
 
     return {
         type: description.type,
