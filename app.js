@@ -14,7 +14,6 @@ let scannerStream = null;
 let scanningActive = false;
 
 // DOM elements
-const localVideo = document.getElementById('localVideo');
 const remoteVideo = document.getElementById('remoteVideo');
 const createOfferBtn = document.getElementById('createOfferBtn');
 const startScanBtn = document.getElementById('startScanBtn');
@@ -222,13 +221,30 @@ createOfferBtn.addEventListener('click', async () => {
         if (!localStream) {
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({
-                    video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+                    video: {
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 },
+                        facingMode: 'user' // Front camera for video calls
+                    },
                     audio: true
                 });
-                localVideo.srcObject = localStream;
+                console.log('✅ Camera and microphone accessed successfully');
             } catch (error) {
                 console.error('Error accessing media devices:', error);
-                alert('Camera/microphone access is required to create a connection. Please grant permissions and try again.');
+
+                // Provide specific error messages for mobile
+                let errorMsg = 'Camera/microphone access required. ';
+                if (error.name === 'NotAllowedError') {
+                    errorMsg += 'Please grant permissions in your browser settings.';
+                } else if (error.name === 'NotFoundError') {
+                    errorMsg += 'No camera or microphone found.';
+                } else if (error.name === 'NotReadableError') {
+                    errorMsg += 'Camera is being used by another app.';
+                } else {
+                    errorMsg += error.message;
+                }
+
+                alert(errorMsg);
                 updateStatus('waiting', '⚠️ Camera access denied. Please grant permissions and try again.');
                 return;
             }
@@ -329,6 +345,30 @@ function decompressData(str) {
     }
 }
 
+// Sanitize SDP to remove problematic lines that cause parsing errors
+function sanitizeSDP(description) {
+    if (!description || !description.sdp) {
+        return description;
+    }
+
+    // Remove lines that cause parsing errors in some browsers
+    const problematicLines = [
+        'a=max-message-size:', // Causes issues on some browsers
+        'a=extmap-allow-mixed' // Sometimes problematic
+    ];
+
+    const lines = description.sdp.split('\r\n');
+    const sanitized = lines.filter(line => {
+        return !problematicLines.some(problematic => line.startsWith(problematic));
+    }).join('\r\n');
+
+    console.log(`SDP sanitized: removed ${lines.length - sanitized.split('\r\n').length} problematic lines`);
+
+    return {
+        type: description.type,
+        sdp: sanitized
+    };
+}
 
 // Generate QR code (with animated chunks for large data)
 function generateQRCode(data, container) {
@@ -714,13 +754,30 @@ async function handleOffer(offer) {
         if (!localStream) {
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({
-                    video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+                    video: {
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 },
+                        facingMode: 'user' // Front camera for video calls
+                    },
                     audio: true
                 });
-                localVideo.srcObject = localStream;
+                console.log('✅ Camera and microphone accessed successfully');
             } catch (error) {
                 console.error('Error accessing media devices:', error);
-                alert('Camera/microphone access is required. Please grant permissions and try again.');
+
+                // Provide specific error messages for mobile
+                let errorMsg = 'Camera/microphone access required. ';
+                if (error.name === 'NotAllowedError') {
+                    errorMsg += 'Please grant permissions in your browser settings.';
+                } else if (error.name === 'NotFoundError') {
+                    errorMsg += 'No camera or microphone found.';
+                } else if (error.name === 'NotReadableError') {
+                    errorMsg += 'Camera is being used by another app.';
+                } else {
+                    errorMsg += error.message;
+                }
+
+                alert(errorMsg);
                 updateStatus('waiting', '⚠️ Camera access denied. Please grant permissions and try again.');
                 return;
             }
@@ -739,8 +796,9 @@ async function handleOffer(offer) {
             setupDataChannel(event.channel);
         };
 
-        // Set remote description
-        await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+        // Sanitize and set remote description
+        const sanitizedOffer = sanitizeSDP(offer);
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(sanitizedOffer));
 
         // Create answer
         const answer = await peerConnection.createAnswer();
@@ -767,7 +825,11 @@ async function handleOffer(offer) {
 async function handleAnswer(answer) {
     try {
         updateStatus('connecting', 'Processing answer...');
-        await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+
+        // Sanitize and set remote description
+        const sanitizedAnswer = sanitizeSDP(answer);
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(sanitizedAnswer));
+
         updateStatus('connecting', 'Connection established! Waiting for peer...');
     } catch (error) {
         console.error('Error handling answer:', error);
