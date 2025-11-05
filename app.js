@@ -14,7 +14,6 @@ let scannerStream = null;
 let scanningActive = false;
 
 // DOM elements
-const remoteVideo = document.getElementById('remoteVideo');
 const createOfferBtn = document.getElementById('createOfferBtn');
 const startScanBtn = document.getElementById('startScanBtn');
 const stopScanBtn = document.getElementById('stopScanBtn');
@@ -44,20 +43,7 @@ function updateStatus(state, message) {
 function createPeerConnection() {
     peerConnection = new RTCPeerConnection(configuration);
 
-    // Add local stream tracks to peer connection
-    if (localStream) {
-        localStream.getTracks().forEach(track => {
-            peerConnection.addTrack(track, localStream);
-        });
-    }
-
-    // Handle remote stream
-    peerConnection.ontrack = (event) => {
-        console.log('Received remote track:', event.track.kind);
-        if (remoteVideo.srcObject !== event.streams[0]) {
-            remoteVideo.srcObject = event.streams[0];
-        }
-    };
+    // No media streams needed - data channel only for background control
 
     // Handle ICE candidates - collect them for bootstrap
     peerConnection.onicecandidate = (event) => {
@@ -214,43 +200,10 @@ function sendBackgroundChange(color) {
 // Create offer (Device 1)
 createOfferBtn.addEventListener('click', async () => {
     try {
-        updateStatus('connecting', 'Requesting camera access...');
+        updateStatus('connecting', 'Creating offer...');
         roleDiv.textContent = '📱 You are Device 1 (Offerer)';
 
-        // Get local video stream if not already available
-        if (!localStream) {
-            try {
-                localStream = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 },
-                        facingMode: 'user' // Front camera for video calls
-                    },
-                    audio: true
-                });
-                console.log('✅ Camera and microphone accessed successfully');
-            } catch (error) {
-                console.error('Error accessing media devices:', error);
-
-                // Provide specific error messages for mobile
-                let errorMsg = 'Camera/microphone access required. ';
-                if (error.name === 'NotAllowedError') {
-                    errorMsg += 'Please grant permissions in your browser settings.';
-                } else if (error.name === 'NotFoundError') {
-                    errorMsg += 'No camera or microphone found.';
-                } else if (error.name === 'NotReadableError') {
-                    errorMsg += 'Camera is being used by another app.';
-                } else {
-                    errorMsg += error.message;
-                }
-
-                alert(errorMsg);
-                updateStatus('waiting', '⚠️ Camera access denied. Please grant permissions and try again.');
-                return;
-            }
-        }
-
-        updateStatus('connecting', 'Creating offer...');
+        // No media streams needed - data channel only
 
         // Create peer connection
         if (peerConnection) {
@@ -748,43 +701,10 @@ async function handleScannedData(data) {
 // Handle offer (Device 2)
 async function handleOffer(offer) {
     try {
-        updateStatus('connecting', 'Requesting camera access...');
+        updateStatus('connecting', 'Processing offer...');
         roleDiv.textContent = '📱 You are Device 2 (Answerer)';
 
-        // Get local video stream if not already available
-        if (!localStream) {
-            try {
-                localStream = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 },
-                        facingMode: 'user' // Front camera for video calls
-                    },
-                    audio: true
-                });
-                console.log('✅ Camera and microphone accessed successfully');
-            } catch (error) {
-                console.error('Error accessing media devices:', error);
-
-                // Provide specific error messages for mobile
-                let errorMsg = 'Camera/microphone access required. ';
-                if (error.name === 'NotAllowedError') {
-                    errorMsg += 'Please grant permissions in your browser settings.';
-                } else if (error.name === 'NotFoundError') {
-                    errorMsg += 'No camera or microphone found.';
-                } else if (error.name === 'NotReadableError') {
-                    errorMsg += 'Camera is being used by another app.';
-                } else {
-                    errorMsg += error.message;
-                }
-
-                alert(errorMsg);
-                updateStatus('waiting', '⚠️ Camera access denied. Please grant permissions and try again.');
-                return;
-            }
-        }
-
-        updateStatus('connecting', 'Processing offer...');
+        // No media streams needed - data channel only
 
         // Create peer connection
         if (peerConnection) {
