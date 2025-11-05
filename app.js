@@ -104,21 +104,25 @@ function createPeerConnection() {
 
     // Handle connection state changes
     peerConnection.onconnectionstatechange = () => {
-        console.log('Connection state:', peerConnection.connectionState);
+        console.log('🔌 Connection state:', peerConnection.connectionState);
         switch (peerConnection.connectionState) {
             case 'connected':
+                console.log('🎉 CONNECTION ESTABLISHED!');
                 updateStatus('connected', '✅ Connected! You can now control each other\'s backgrounds.');
                 enableControlButtons();
                 break;
             case 'disconnected':
+                console.log('⚠️ Connection disconnected');
                 updateStatus('waiting', 'Disconnected. Refresh to reconnect.');
                 disableControlButtons();
                 break;
             case 'failed':
+                console.log('❌ Connection failed');
                 updateStatus('waiting', 'Connection failed. Refresh to try again.');
                 disableControlButtons();
                 break;
             case 'connecting':
+                console.log('🔄 Connecting...');
                 updateStatus('connecting', 'Connecting...');
                 break;
         }
@@ -770,20 +774,29 @@ async function reassembleAndProcess() {
 // Handle scanned QR code data
 async function handleScannedData(data) {
     try {
+        console.log('📥 Processing data...', data.substring(0, 50) + '...');
+
         // Decompress if data was compressed
         const decompressed = decompressData(data);
         const signalData = JSON.parse(decompressed);
 
+        console.log(`📋 Data type: ${signalData.type}`);
+
         if (signalData.type === 'offer') {
             // This device is Device 2 - create answer
+            console.log('📨 Received offer, processing...');
             await handleOffer(signalData);
         } else if (signalData.type === 'answer') {
             // This device is Device 1 - handle answer
+            console.log('📨 Received answer, processing...');
             await handleAnswer(signalData);
+        } else {
+            console.error('❌ Unknown data type:', signalData.type);
+            alert('Invalid data type. Expected "offer" or "answer".');
         }
     } catch (error) {
-        console.error('Error handling scanned data:', error);
-        alert('Invalid QR code data. Please try the manual copy/paste method.');
+        console.error('❌ Error handling data:', error);
+        alert('Invalid data format. Please make sure you copied the complete data.');
     }
 }
 
