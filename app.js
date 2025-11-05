@@ -404,7 +404,7 @@ function generateSingleQR(data, container) {
         container.innerHTML = `
             <div style="text-align: center;">
                 ${qrImage}
-                <button onclick="navigator.clipboard.writeText('${data.replace(/'/g, "\\'")}').then(() => alert('✅ Copied to clipboard!'))" 
+                <button id="copyQRDataBtn" 
                         style="margin-top: 15px; padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 0.9em;">
                     📋 Copy Data to Clipboard
                 </button>
@@ -418,6 +418,21 @@ function generateSingleQR(data, container) {
             img.style.height = 'auto';
             img.style.display = 'block';
             img.style.margin = '0 auto';
+        }
+
+        // Add event listener for copy button
+        const copyBtn = container.querySelector('#copyQRDataBtn');
+        if (copyBtn) {
+            copyBtn.addEventListener('click', async () => {
+                try {
+                    await navigator.clipboard.writeText(data);
+                    alert('✅ Copied to clipboard!');
+                    console.log('✅ Data copied to clipboard');
+                } catch (error) {
+                    console.error('Failed to copy:', error);
+                    alert('❌ Failed to copy. Please try manual copy/paste.');
+                }
+            });
         }
 
         console.log('✅ Single QR code generated');
@@ -618,6 +633,14 @@ startScanBtn.addEventListener('click', async () => {
         }
 
         scannerVideo.srcObject = scannerStream;
+
+        // Wait for video to be ready and start playing
+        try {
+            await scannerVideo.play();
+            console.log('✅ Video playing');
+        } catch (error) {
+            console.error('Error playing video:', error);
+        }
 
         // Start scanning
         requestAnimationFrame(scanQRCode);
