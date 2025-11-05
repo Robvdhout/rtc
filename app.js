@@ -272,6 +272,10 @@ createOfferBtn.addEventListener('click', async () => {
 let pendingIceCandidates = [];
 let iceCandidatesReceived = false;
 
+// Store received QR chunks for reassembly
+let receivedChunks = {};
+let expectedTotalChunks = null;
+
 // Create minimal SDP by removing ICE candidates (reduces size by 80-90%)
 
 // Compress data using base64 encoding
@@ -326,7 +330,7 @@ function decompressData(str) {
 }
 
 
-// Generate QR code
+// Generate QR code (with animated chunks for large data)
 function generateQRCode(data, container) {
     container.innerHTML = '';
 
@@ -341,25 +345,28 @@ function generateQRCode(data, container) {
         return;
     }
 
-    // Check if data is too large for QR code (even after compression)
-    // Modern QR scanners can handle larger codes - Version 40 can hold ~3KB
-    if (processedData.length > 4000) {
-        console.warn('Data too large for QR code, showing manual copy option');
-        showManualCopyUI(data, container, '⚠️ Connection data too large for QR code');
-        return;
-    }
+    // Check if data fits in single QR code
+    const CHUNK_SIZE = 2000; // Safe size for single QR code
 
+    if (processedData.length <= CHUNK_SIZE) {
+        // Single QR code
+        generateSingleQR(processedData, container);
+    } else {
+        // Multiple QR codes (animated)
+        generateAnimatedQR(processedData, container);
+    }
+}
+
+// Generate a single QR code
+function generateSingleQR(data, container) {
     try {
-        // qrcode-generator API with lowest error correction for maximum data capacity
-        const qr = qrcode(0, 'L'); // 0 = auto, 'L' = low error correction (max capacity)
-        qr.addData(processedData);
+        const qr = qrcode(0, 'L');
+        qr.addData(data);
         qr.make();
 
-        // Create image element with the QR code - very small cells for dense data
-        const qrImage = qr.createImgTag(3, 4); // smaller cell size (3px) and margin (4px)
+        const qrImage = qr.createImgTag(3, 4);
         container.innerHTML = qrImage;
 
-        // Style the image
         const img = container.querySelector('img');
         if (img) {
             img.style.maxWidth = '100%';
@@ -367,11 +374,140 @@ function generateQRCode(data, container) {
             img.style.display = 'block';
             img.style.margin = '0 auto';
         }
+
+        console.log('✅ Single QR code generated');
     } catch (error) {
         console.error('Error generating QR code:', error);
-        // Fallback to text display
         showManualCopyUI(data, container, `⚠️ Could not generate QR code: ${error.message}`);
     }
+}
+
+// Generate animated QR codes (multiple chunks)
+function generateAnimatedQR(data, container) {
+    const CHUNK_SIZE = 1800; // Smaller chunks for reliability
+
+    // Split data into chunks
+    const chunks = [];
+    for (let i = 0; i < data.length; i += CHUNK_SIZE) {
+        chunks.push(data.substring(i, i + CHUNK_SIZE));
+    }
+
+    const totalChunks = chunks.length;
+    console.log(`📊 Data split into ${totalChunks} chunks`);
+
+    // Add chunk metadata to each chunk
+    const chunksWithMetadata = chunks.map((chunk, index) => {
+        return JSON.stringify({
+            chunk: index + 1,
+            total: totalChunks,
+            data: chunk
+        });
+    });
+
+    let currentChunk = 0;
+    let animationInterval = null;
+
+    // Create UI
+    container.innerHTML = `
+        <div style="text-align: center; padding: 20px;">
+            <p style="color: #667eea; font-weight: bold; margin-bottom: 10px;">📱 Animated QR Codes</p>
+            <p style="color: #666; font-size: 0.9em; margin-bottom: 15px;">
+                Chunk <span id="currentChunk">1</span> of <span id="totalChunks">${totalChunks}</span>
+            </p>
+            <div id="qrChunkContainer" style="min-height: 300px; display: flex; align-items: center; justify-content: center; background: #f8f9fa; border-radius: 10px; padding: 20px;">
+                <!-- QR codes will appear here -->
+            </div>
+            <div style="margin-top: 15px;">
+                <button id="pauseBtn" style="padding: 10px 20px; background: #ffa502; color: white; border: none; border-radius: 5px; cursor: pointer; margin-right: 10px;">
+                    ⏸ Pause
+                </button>
+                <button id="prevChunkBtn" style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer; margin-right: 10px;">
+                    ← Previous
+                </button>
+                <button id="nextChunkBtn" style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                    Next →
+                </button>
+            </div>
+            <p style="color: #999; font-size: 0.85em; margin-top: 15px;">
+                💡 Scan each QR code in sequence on the other device
+            </p>
+            <button id="showManualBtn" style="margin-top: 10px; padding: 8px 16px; background: #e74c3c; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 0.9em;">
+                Too difficult? Show manual copy option
+            </button>
+        </div>
+    `;
+
+    const qrChunkContainer = document.getElementById('qrChunkContainer');
+    const currentChunkSpan = document.getElementById('currentChunk');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const prevBtn = document.getElementById('prevChunkBtn');
+    const nextBtn = document.getElementById('nextChunkBtn');
+    const showManualBtn = document.getElementById('showManualBtn');
+
+    let isPaused = false;
+
+    // Function to display a specific chunk
+    function displayChunk(index) {
+        currentChunk = index;
+        currentChunkSpan.textContent = index + 1;
+
+        try {
+            const qr = qrcode(0, 'L');
+            qr.addData(chunksWithMetadata[index]);
+            qr.make();
+
+            qrChunkContainer.innerHTML = qr.createImgTag(4, 8);
+
+            const img = qrChunkContainer.querySelector('img');
+            if (img) {
+                img.style.maxWidth = '100%';
+                img.style.height = 'auto';
+            }
+        } catch (error) {
+            console.error('Error generating chunk QR:', error);
+            qrChunkContainer.innerHTML = `<p style="color: red;">Error generating chunk ${index + 1}</p>`;
+        }
+    }
+
+    // Start animation
+    function startAnimation() {
+        if (animationInterval) clearInterval(animationInterval);
+
+        animationInterval = setInterval(() => {
+            if (!isPaused) {
+                currentChunk = (currentChunk + 1) % totalChunks;
+                displayChunk(currentChunk);
+            }
+        }, 2000); // Change every 2 seconds
+    }
+
+    // Event listeners
+    pauseBtn.addEventListener('click', () => {
+        isPaused = !isPaused;
+        pauseBtn.textContent = isPaused ? '▶ Resume' : '⏸ Pause';
+        pauseBtn.style.background = isPaused ? '#2ecc71' : '#ffa502';
+    });
+
+    prevBtn.addEventListener('click', () => {
+        currentChunk = (currentChunk - 1 + totalChunks) % totalChunks;
+        displayChunk(currentChunk);
+    });
+
+    nextBtn.addEventListener('click', () => {
+        currentChunk = (currentChunk + 1) % totalChunks;
+        displayChunk(currentChunk);
+    });
+
+    showManualBtn.addEventListener('click', () => {
+        if (animationInterval) clearInterval(animationInterval);
+        showManualCopyUI(data, container, '⚠️ Switched to manual copy mode');
+    });
+
+    // Display first chunk and start animation
+    displayChunk(0);
+    startAnimation();
+
+    console.log('✅ Animated QR sequence started');
 }
 
 // Show manual copy UI
@@ -467,6 +603,20 @@ function scanQRCode() {
 
         if (code) {
             console.log('QR code detected');
+
+            // Check if this is a chunked QR code
+            try {
+                const parsed = JSON.parse(code.data);
+                if (parsed.chunk && parsed.total && parsed.data) {
+                    // This is a chunk!
+                    handleQRChunk(parsed);
+                    return; // Don't stop scanning - need more chunks
+                }
+            } catch (e) {
+                // Not a chunk, process as regular QR
+            }
+
+            // Regular QR code (single data)
             handleScannedData(code.data);
             stopScanning();
             return;
@@ -474,6 +624,64 @@ function scanQRCode() {
     }
 
     requestAnimationFrame(scanQRCode);
+}
+
+// Handle QR chunk (part of animated sequence)
+function handleQRChunk(chunkData) {
+    const { chunk, total, data } = chunkData;
+
+    // Initialize if first chunk
+    if (expectedTotalChunks === null) {
+        expectedTotalChunks = total;
+        receivedChunks = {};
+        console.log(`📊 Started receiving ${total} chunks`);
+        updateStatus('connecting', `Receiving chunk 1 of ${total}... Keep scanning!`);
+    }
+
+    // Store chunk
+    if (!receivedChunks[chunk]) {
+        receivedChunks[chunk] = data;
+        const received = Object.keys(receivedChunks).length;
+        console.log(`✅ Received chunk ${chunk}/${total} (${received} total)`);
+        updateStatus('connecting', `Received ${received} of ${total} chunks... Keep scanning!`);
+    } else {
+        console.log(`⚠️ Chunk ${chunk} already received, skipping`);
+    }
+
+    // Check if we have all chunks
+    if (Object.keys(receivedChunks).length === expectedTotalChunks) {
+        console.log('🎉 All chunks received! Reassembling...');
+        reassembleAndProcess();
+    }
+}
+
+// Reassemble chunks and process data
+async function reassembleAndProcess() {
+    stopScanning();
+
+    // Reassemble in order
+    let fullData = '';
+    for (let i = 1; i <= expectedTotalChunks; i++) {
+        if (receivedChunks[i]) {
+            fullData += receivedChunks[i];
+        } else {
+            console.error(`Missing chunk ${i}!`);
+            alert(`Error: Missing chunk ${i}. Please try scanning again.`);
+            receivedChunks = {};
+            expectedTotalChunks = null;
+            return;
+        }
+    }
+
+    console.log(`✅ Reassembled data: ${fullData.length} bytes`);
+    updateStatus('connecting', 'Processing assembled data...');
+
+    // Reset for next scan
+    receivedChunks = {};
+    expectedTotalChunks = null;
+
+    // Process the complete data
+    await handleScannedData(fullData);
 }
 
 // Handle scanned QR code data
