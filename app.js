@@ -19,6 +19,7 @@ const startScanBtn = document.getElementById('startScanBtn');
 const stopScanBtn = document.getElementById('stopScanBtn');
 const scannerVideo = document.getElementById('scannerVideo');
 const scannerContainer = document.getElementById('scannerContainer');
+const cameraSelect = document.getElementById('cameraSelect');
 const offerQR = document.getElementById('offerQR');
 const statusDiv = document.getElementById('status');
 const roleDiv = document.getElementById('role');
@@ -31,6 +32,47 @@ const processDataBtn = document.getElementById('processDataBtn');
 // Initialize
 async function init() {
     updateStatus('waiting', '✅ Ready to connect. Click "Generate QR Code" to start or "Scan QR Code" to join.');
+    await loadAvailableCameras();
+}
+
+// Load available cameras and populate dropdown
+async function loadAvailableCameras() {
+    try {
+        // Request camera permission to enumerate devices
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        stream.getTracks().forEach(track => track.stop()); // Stop immediately after permission granted
+
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(device => device.kind === 'videoinput');
+
+        cameraSelect.innerHTML = '';
+
+        if (videoDevices.length === 0) {
+            cameraSelect.innerHTML = '<option value="">No cameras found</option>';
+            return;
+        }
+
+        // Add default option for mobile (tries rear camera first)
+        if (isMobile()) {
+            cameraSelect.innerHTML += '<option value="auto">Auto (Rear camera preferred)</option>';
+        } else {
+            cameraSelect.innerHTML += '<option value="auto">Default Camera</option>';
+        }
+
+        // Add each camera
+        videoDevices.forEach((device, index) => {
+            const label = device.label || `Camera ${index + 1}`;
+            const option = document.createElement('option');
+            option.value = device.deviceId;
+            option.textContent = label;
+            cameraSelect.appendChild(option);
+        });
+
+        console.log(`✅ Found ${videoDevices.length} camera(s)`);
+    } catch (error) {
+        console.error('Error loading cameras:', error);
+        cameraSelect.innerHTML = '<option value="auto">Default Camera</option>';
+    }
 }
 
 // Update status display
@@ -359,7 +401,16 @@ function generateSingleQR(data, container) {
         qr.make();
 
         const qrImage = qr.createImgTag(3, 4);
-        container.innerHTML = qrImage;
+        container.innerHTML = `
+            <div style="text-align: center;">
+                ${qrImage}
+                <button onclick="navigator.clipboard.writeText('${data.replace(/'/g, "\\'")}').then(() => alert('✅ Copied to clipboard!'))" 
+                        style="margin-top: 15px; padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 0.9em;">
+                    📋 Copy Data to Clipboard
+                </button>
+                <p style="color: #999; font-size: 0.85em; margin-top: 10px;">In case scanning doesn't work</p>
+            </div>
+        `;
 
         const img = container.querySelector('img');
         if (img) {
@@ -520,35 +571,49 @@ function showManualCopyUI(data, container, message) {
     `;
 }
 
+// Detect if device is mobile
+function isMobile() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+           (navigator.maxTouchPoints && navigator.maxTouchPoints > 2);
+}
+
 // Start scanning QR code
 startScanBtn.addEventListener('click', async () => {
     try {
         scannerContainer.style.display = 'block';
         scanningActive = true;
 
-        // Get camera stream for scanning - prefer rear camera on mobile
-        try {
-            // Try to explicitly request rear camera first
+        const selectedCamera = cameraSelect.value;
+
+        // Get camera stream for scanning
+        if (selectedCamera && selectedCamera !== 'auto') {
+            // Use specific selected camera
             scannerStream = await navigator.mediaDevices.getUserMedia({
-                video: {
-                    facingMode: { exact: 'environment' }
-                }
+                video: { deviceId: { exact: selectedCamera } }
             });
-        } catch (error) {
-            console.log('Exact environment camera not found, trying ideal...');
-            // Fallback to ideal (prefer rear but allow front if rear not available)
-            try {
-                scannerStream = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        facingMode: { ideal: 'environment' }
-                    }
-                });
-            } catch (error2) {
-                console.log('Ideal environment failed, trying any camera...');
-                // Last fallback - any camera
+            const selectedOption = cameraSelect.options[cameraSelect.selectedIndex];
+            console.log(`✅ Selected camera opened: ${selectedOption.text}`);
+        } else {
+            // Auto mode: Mobile tries rear camera first, Desktop uses default
+            if (isMobile()) {
+                // Mobile device - prefer rear camera
+                try {
+                    scannerStream = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: { exact: 'environment' } }
+                    });
+                    console.log('✅ Rear camera opened (auto mode)');
+                } catch (error) {
+                    console.log('Rear camera not available, using front camera');
+                    scannerStream = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: 'user' }
+                    });
+                }
+            } else {
+                // Desktop - just use default camera (webcam)
                 scannerStream = await navigator.mediaDevices.getUserMedia({
                     video: true
                 });
+                console.log('✅ Webcam opened (auto mode)');
             }
         }
 

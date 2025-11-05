@@ -28,6 +28,12 @@
 
             <div class="qr-section">
                 <h3>Step 2: Scan QR Code</h3>
+                <div style="margin-bottom: 10px;">
+                    <label for="cameraSelect" style="display: block; margin-bottom: 5px; color: #666;">Select Camera:</label>
+                    <select id="cameraSelect" class="btn" style="padding: 10px; border-radius: 5px; border: 1px solid #ddd; background: white; cursor: pointer; min-width: 200px;">
+                        <option value="">Loading cameras...</option>
+                    </select>
+                </div>
                 <button id="startScanBtn" class="btn btn-secondary">Scan QR Code</button>
                 <div id="scannerContainer" class="scanner-container" style="display: none;">
                     <video id="scannerVideo" playsinline></video>
