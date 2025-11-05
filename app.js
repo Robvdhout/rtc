@@ -60,10 +60,18 @@ function createPeerConnection() {
         }
     };
 
-    // Handle ICE candidates
+    // Handle ICE candidates - collect them for bootstrap
     peerConnection.onicecandidate = (event) => {
         if (event.candidate) {
-            console.log('New ICE candidate:', event.candidate);
+            console.log('New ICE candidate:', event.candidate.candidate);
+            // Store candidate for bootstrap (will be sent via data channel)
+            pendingIceCandidates.push({
+                candidate: event.candidate.candidate,
+                sdpMid: event.candidate.sdpMid,
+                sdpMLineIndex: event.candidate.sdpMLineIndex
+            });
+        } else {
+            console.log('ICE gathering complete -', pendingIceCandidates.length, 'candidates collected');
         }
     };
 
@@ -164,13 +172,12 @@ async function handleBootstrapICECandidates(candidates) {
     iceCandidatesReceived = true;
 
     // Add each candidate to the peer connection
-    for (const candidateStr of candidates) {
+    for (const candidateData of candidates) {
         try {
-            // Reconstruct the candidate object
             const candidate = new RTCIceCandidate({
-                candidate: candidateStr,
-                sdpMLineIndex: 0, // Will be auto-detected by browser
-                sdpMid: null
+                candidate: candidateData.candidate,
+                sdpMid: candidateData.sdpMid,
+                sdpMLineIndex: candidateData.sdpMLineIndex
             });
 
             await peerConnection.addIceCandidate(candidate);
@@ -243,20 +250,12 @@ createOfferBtn.addEventListener('click', async () => {
         const offer = await peerConnection.createOffer();
         await peerConnection.setLocalDescription(offer);
 
-        // Wait briefly for initial ICE candidates to be gathered
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // The SDP at this point doesn't contain ICE candidates yet
+        // They'll be collected via onicecandidate event and sent later via data channel
+        const offerData = JSON.stringify(peerConnection.localDescription);
 
-        // Extract and store ICE candidates for bootstrap
-        pendingIceCandidates = extractICECandidates(peerConnection.localDescription);
-        console.log(`Stored ${pendingIceCandidates.length} ICE candidates for bootstrap`);
-
-        // Extract minimal SDP (without ICE candidates to reduce size)
-        const minimalOffer = createMinimalSDP(peerConnection.localDescription);
-        const offerData = JSON.stringify(minimalOffer);
-
-        console.log(`Full SDP size: ${JSON.stringify(peerConnection.localDescription).length}`);
-        console.log(`Minimal SDP size: ${offerData.length}`);
-        console.log(`Bootstrap method: Will send ICE candidates via data channel after connection`);
+        console.log(`SDP size (without ICE): ${offerData.length}`);
+        console.log(`Bootstrap: ICE candidates will be collected and sent via data channel`);
 
         // Generate QR code
         generateQRCode(offerData, offerQR);
@@ -274,37 +273,6 @@ let pendingIceCandidates = [];
 let iceCandidatesReceived = false;
 
 // Create minimal SDP by removing ICE candidates (reduces size by 80-90%)
-function createMinimalSDP(description) {
-    const sdp = description.sdp;
-
-    // Remove all ICE candidate lines (a=candidate:...)
-    const minimalSdp = sdp.split('\n')
-        .filter(line => !line.startsWith('a=candidate:'))
-        .filter(line => !line.startsWith('a=end-of-candidates'))
-        .join('\n');
-
-    return {
-        type: description.type,
-        sdp: minimalSdp
-    };
-}
-
-// Extract ICE candidates from full SDP
-function extractICECandidates(description) {
-    const sdp = description.sdp;
-    const candidates = [];
-
-    const lines = sdp.split('\n');
-    for (const line of lines) {
-        if (line.startsWith('a=candidate:')) {
-            // Parse the candidate line
-            candidates.push(line.substring(2)); // Remove 'a=' prefix
-        }
-    }
-
-    return candidates;
-}
-
 
 // Compress data using base64 encoding
 function compressData(str) {
@@ -570,20 +538,12 @@ async function handleOffer(offer) {
         const answer = await peerConnection.createAnswer();
         await peerConnection.setLocalDescription(answer);
 
-        // Wait briefly for initial ICE candidates to be gathered
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // The SDP at this point doesn't contain ICE candidates yet
+        // They'll be collected via onicecandidate event and sent later via data channel
+        const answerData = JSON.stringify(peerConnection.localDescription);
 
-        // Extract and store ICE candidates for bootstrap
-        pendingIceCandidates = extractICECandidates(peerConnection.localDescription);
-        console.log(`Stored ${pendingIceCandidates.length} ICE candidates for bootstrap`);
-
-        // Extract minimal SDP (without ICE candidates to reduce size)
-        const minimalAnswer = createMinimalSDP(peerConnection.localDescription);
-        const answerData = JSON.stringify(minimalAnswer);
-
-        console.log(`Full SDP size: ${JSON.stringify(peerConnection.localDescription).length}`);
-        console.log(`Minimal SDP size: ${answerData.length}`);
-        console.log(`Bootstrap method: Will send ICE candidates via data channel after connection`);
+        console.log(`SDP size (without ICE): ${answerData.length}`);
+        console.log(`Bootstrap: ICE candidates will be collected and sent via data channel`);
 
         // Generate QR code
         generateQRCode(answerData, offerQR);
