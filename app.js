@@ -354,6 +354,7 @@ function sanitizeSDP(description) {
     // Remove lines that cause parsing errors in some browsers
     const problematicLines = [
         'a=max-message-size:', // Causes issues on some browsers
+        'a=sctp-port:', // Causes parsing errors on some browsers
         'a=extmap-allow-mixed' // Sometimes problematic
     ];
 
