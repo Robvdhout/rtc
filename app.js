@@ -805,8 +805,16 @@ async function handleOffer(offer) {
             setupDataChannel(event.channel);
         };
 
-        // Set remote description
-        await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+        // Set remote description (with automatic sanitization fallback)
+        try {
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+            console.log('✅ SDP accepted without sanitization');
+        } catch (error) {
+            console.log('⚠️ SDP rejected, trying with sanitization...', error.message);
+            const sanitizedOffer = sanitizeSDP(offer);
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(sanitizedOffer));
+            console.log('✅ SDP accepted with sanitization');
+        }
 
         // Create answer
         const answer = await peerConnection.createAnswer();
@@ -834,8 +842,16 @@ async function handleAnswer(answer) {
     try {
         updateStatus('connecting', 'Processing answer...');
 
-        // Set remote description
-        await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+        // Set remote description (with automatic sanitization fallback)
+        try {
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+            console.log('✅ SDP accepted without sanitization');
+        } catch (error) {
+            console.log('⚠️ SDP rejected, trying with sanitization...', error.message);
+            const sanitizedAnswer = sanitizeSDP(answer);
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(sanitizedAnswer));
+            console.log('✅ SDP accepted with sanitization');
+        }
 
         updateStatus('connecting', 'Connection established! Waiting for peer...');
     } catch (error) {
